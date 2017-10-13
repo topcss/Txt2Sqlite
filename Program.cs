@@ -25,20 +25,52 @@ namespace Txt2Sqlite
         static Regex reg = new Regex("[\\s]+");
         static Data LineToData(string lineStr)
         {
+            // 处理分割符
             string[] line = reg.Replace(lineStr, " ").Split(' ');// 把多个空格分割成一个，再分拆
+            //string[] line = lineStr.Split('#');
+            //string[] line = lineStr.Split(',');
 
             var model = new Data();
             for (int i = 0; i < line.Length; i++)
             {
-                if (i == 0) model.Username = line[0];
-                else if (Regex.IsMatch(line[i], @"\w+@\w+\.\w+"))
+                var text = line[i].Trim();
+
+                // 处理不同的列
+                //    default: // 第一列 用户名，之后有邮箱和密码的
+
+                //if (i == 0) model.Username = text;
+                //else if (Regex.IsMatch(text, @"\w+@\w+\.\w+"))
+                //{
+                //    model.Email = text;
+                //}
+                //else
+                //{
+                //    model.Password = text;
+                //}
+
+                //    case 1:// 第一列为id忽略，之后有用户名和密码的
+
+                if (i == 0) { }
+                if (i == 1)
                 {
-                    model.Email = line[i];
+                    model.Username = text;
                 }
                 else
                 {
-                    model.Password = line[i];
+                    model.Password = text;
                 }
+
+                //    // 第一列为邮箱，之后为密码的
+
+                //        if (Regex.IsMatch(text, @"\w+@\w+\.\w+"))
+                //        {
+                //            model.Email = text;
+                //        }
+                //        else
+                //        {
+                //            model.Password = text;
+                //        }
+
             }
             return model;
         }
@@ -85,6 +117,45 @@ namespace Txt2Sqlite
                 Console.WriteLine($"成功提交：{sucessCount} 条，耗时:{ (watch.ElapsedTicks / (decimal)Stopwatch.Frequency).ToString("0.0000")} 秒。");
             }
         }
+
+        /// <summary>
+        /// 运行cmd命令
+        /// 会显示命令窗口
+        /// </summary>
+        /// <param name="cmdExe">指定应用程序的完整路径</param>
+        /// <param name="cmdStr">执行命令行参数</param>
+        static bool RunCmd(string cmdExe, string cmdStr)
+        {
+            bool result = false;
+            try
+            {
+                using (Process myPro = new Process())
+                {
+                    //指定启动进程是调用的应用程序和命令行参数
+                    ProcessStartInfo psi = new ProcessStartInfo(cmdExe, cmdStr);
+                    myPro.StartInfo = psi;
+                    myPro.Start();
+                    //myPro.WaitForExit();
+                    result = true;
+                }
+            }
+            catch
+            {
+
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 执行sqlite的sql语句
+        /// </summary>
+        /// <param name="sql"></param>
+        static void RunSqlCmd(string sql)
+        {
+            DbCommand cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
+        }
         #endregion
 
         static void Main(string[] args)
@@ -108,12 +179,21 @@ namespace Txt2Sqlite
             //dbPath = @"F:\password\leak4pwd\sqlite3\tianya.db";
             //table = "tianya";
 
+            // 创建数据库文件
+            Console.WriteLine($"正在创建数据库文件 ...");
+            RunCmd("sqlite3", dbPath);
+
             try
             {
                 // 连接数据库  
                 conn.ConnectionString = string.Format(
                     @"data source={0};Version=3;datetimeformat=Ticks", dbPath);
                 conn.Open();
+
+                // 创建表
+                Console.WriteLine($"正在创建表 ...");
+                RunSqlCmd("PRAGMA auto_vacuum = 1;");
+                RunSqlCmd($"CREATE TABLE main.[{table}] (email  TEXT, username  TEXT, password  TEXT);");
 
                 var taskList = new List<Task>();
 
@@ -155,6 +235,11 @@ namespace Txt2Sqlite
                     taskList.Add(Task.Factory.StartNew(() =>
                     {
                         BulkData(table, tmpList);
+
+                        // 加入索引
+                        Console.WriteLine($"正在创建索引 ...");
+                        RunSqlCmd($"CREATE INDEX main.idx_{table}_pwd ON [{table}] (password COLLATE BINARY ASC);");
+                        Console.WriteLine($"共耗时:{ (watch.ElapsedTicks / (decimal)Stopwatch.Frequency).ToString("0.0000")} 秒。");
                     }));
                 }
 
@@ -163,6 +248,8 @@ namespace Txt2Sqlite
                 {
                     conn.Close();// 关闭连接
                     watch.Stop();// 停止计时
+
+                    Console.WriteLine($"所有数据导入完成。");
                 });
             }
             catch (Exception e)
@@ -172,7 +259,6 @@ namespace Txt2Sqlite
                 Console.WriteLine(e.Message);
             }
 
-            Console.WriteLine($"所有数据导入完成。");
             Console.ReadKey();
         }
     }
