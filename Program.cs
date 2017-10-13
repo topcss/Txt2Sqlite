@@ -87,32 +87,18 @@ namespace Txt2Sqlite
         }
         #endregion
 
-
         static void Main(string[] args)
         {
+            if (args.Length < 3)
+            {
+                Console.WriteLine("需要三个参数：1，txt路径 2，sqlite数据库路径 3，表名");
+                Console.ReadKey();
+                return;
+            }
+
             // 开始计时  
             watch = new Stopwatch();
             watch.Start();
-
-
-            if (args.Length == 0)
-            {
-                Console.WriteLine("filePath 参数不能为空.");
-                Console.ReadKey();
-                return;
-            }
-            else if (args.Length == 1)
-            {
-                Console.WriteLine("dbPath 参数不能为空.");
-                Console.ReadKey();
-                return;
-            }
-            else if (args.Length == 2)
-            {
-                Console.WriteLine("table 参数不能为空.");
-                Console.ReadKey();
-                return;
-            }
 
             //获取文件路径
             string filePath = args[0];
@@ -139,7 +125,7 @@ namespace Txt2Sqlite
                     // Read and display lines from the file until the end of
                     // the file is reached.
 
-                    int page = 100000;
+                    int page = 200000;
                     int index = 0;
                     var list = new List<Data>();
 
